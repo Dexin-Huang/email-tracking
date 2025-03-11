@@ -1,7 +1,7 @@
 // src/components/EmailDetail.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { EmailStats } from '@/types';
 
@@ -12,27 +12,48 @@ interface EmailDetailProps {
 export default function EmailDetail({ initialData }: EmailDetailProps) {
   const [data, setData] = useState<EmailStats>(initialData);
   const [loading, setLoading] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   // Function to refresh data
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/stats?id=${data.trackingId}`);
       if (response.ok) {
         const newData = await response.json();
         setData(newData);
+        setLastRefreshed(new Date());
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
     setLoading(false);
-  };
+  }, [data.trackingId]);
+
+  // Set up automatic refresh every 30 seconds
+  useEffect(() => {
+    const refreshInterval = setInterval(refreshData, 30000);
+    return () => clearInterval(refreshInterval);
+  }, [refreshData]);
 
   // Format date for display
   const formatDate = (dateString: string | Date | null | undefined) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
     return date.toLocaleString();
+  };
+
+  // Format time since last refresh
+  const formatLastRefreshed = () => {
+    const now = new Date();
+    const seconds = Math.floor((now.getTime() - lastRefreshed.getTime()) / 1000);
+
+    if (seconds < 60) {
+      return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
+    } else {
+      const minutes = Math.floor(seconds / 60);
+      return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    }
   };
 
   // Copy tracking URL to clipboard
@@ -47,10 +68,14 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
 
   return (
     <div className="space-y-6">
-      <div className="mb-6">
+      <div className="mb-6 flex justify-between items-center">
         <Link href="/" className="text-blue-600 dark:text-blue-400 hover:underline">
           ← Back to Dashboard
         </Link>
+
+        <div className="text-sm text-gray-500">
+          Last updated: {formatLastRefreshed()}
+        </div>
       </div>
 
       {/* Email header info */}
@@ -77,9 +102,19 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
             disabled={loading}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white
                      dark:bg-blue-700 dark:hover:bg-blue-600 rounded-md text-sm font-medium
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {loading ? 'Refreshing...' : 'Refresh Data'}
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Refreshing...
+              </>
+            ) : (
+              'Refresh Data'
+            )}
           </button>
         </div>
       </div>

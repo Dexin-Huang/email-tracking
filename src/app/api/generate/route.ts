@@ -39,9 +39,21 @@ export async function POST(request: NextRequest) {
 
     await db.collection('pixels').insertOne(pixelData);
 
-    // Calculate full tracking URL
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ||
-                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    // Calculate full tracking URL with proper protocol
+    let baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+    if (!baseUrl) {
+      if (process.env.VERCEL_URL) {
+        baseUrl = `https://${process.env.VERCEL_URL}`;
+      } else {
+        baseUrl = 'http://localhost:3000';
+      }
+    }
+
+    // Ensure baseUrl has a protocol
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = `https://${baseUrl}`;
+    }
 
     // Return the tracking info with CORS headers
     return NextResponse.json({

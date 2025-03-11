@@ -4,6 +4,9 @@ import Dashboard from '@/components/Dashboard';
 import clientPromise from '@/lib/mongodb';
 import { TrackingPixel, OpenEvent } from '@/types';
 
+// Set revalidation to 0 to disable cache for this route
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: 'Email Tracker Dashboard',
   description: 'Monitor your email opens with a simple tracking system',
