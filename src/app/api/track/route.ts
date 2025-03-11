@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
     'Content-Type': 'image/gif',
     'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
     'Pragma': 'no-cache',
-    'Expires': '0'
+    'Expires': '0',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   };
 
   // If no tracking ID provided, just return the pixel
@@ -52,4 +55,16 @@ export async function GET(request: NextRequest) {
 
   // Return the tracking pixel
   return new NextResponse(TRANSPARENT_GIF_BUFFER, { headers });
+}
+
+// Handle OPTIONS request explicitly for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    }
+  });
 }

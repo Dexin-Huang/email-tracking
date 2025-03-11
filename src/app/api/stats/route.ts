@@ -4,6 +4,13 @@ import clientPromise from '@/lib/mongodb';
 import { EmailStats } from '@/types';
 
 export async function GET(request: NextRequest) {
+  // Add CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+
   // Get tracking ID from the URL
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
@@ -11,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (!id) {
     return NextResponse.json(
       { error: 'Missing tracking ID' },
-      { status: 400 }
+      { status: 400, headers }
     );
   }
 
@@ -26,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (!pixel) {
       return NextResponse.json(
         { error: 'Tracking ID not found' },
-        { status: 404 }
+        { status: 404, headers }
       );
     }
 
@@ -62,13 +69,25 @@ export async function GET(request: NextRequest) {
       }))
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers });
 
   } catch (error) {
     console.error('Error fetching stats:', error);
     return NextResponse.json(
       { error: 'Failed to fetch stats' },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
+}
+
+// Handle OPTIONS request explicitly for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    }
+  });
 }
