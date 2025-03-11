@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Get the origin from the request
-  const origin = request.headers.get('origin') || '';
-
   // Only run this middleware for API routes
   if (request.nextUrl.pathname.startsWith('/api/')) {
     // Handle CORS preflight requests
