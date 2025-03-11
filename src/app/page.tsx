@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// src/app/page.js
 import { Metadata } from 'next';
 import Dashboard from '@/components/Dashboard';
 import clientPromise from '@/lib/mongodb';
