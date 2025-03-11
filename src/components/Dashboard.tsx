@@ -12,6 +12,7 @@ interface DashboardProps {
 
 export default function Dashboard({ initialPixels, initialOpens }: DashboardProps) {
   const [pixels, setPixels] = useState<TrackingPixel[]>(initialPixels);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [opens, setOpens] = useState<OpenEvent[]>(initialOpens);
   const [label, setLabel] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -168,8 +169,8 @@ export default function Dashboard({ initialPixels, initialOpens }: DashboardProp
               <p className="font-medium mb-1">How to use:</p>
               <ol className="list-decimal list-inside space-y-1">
                 <li>In Gmail, compose a new email</li>
-                <li>Click the "Insert photo" button</li>
-                <li>Select "Web Address (URL)"</li>
+                <li>Click the &quot;Insert photo&quot; button</li>
+                <li>Select &quot;Web Address (URL)&quot;</li>
                 <li>Paste this tracking URL and insert</li>
                 <li>Complete your email and send</li>
               </ol>
