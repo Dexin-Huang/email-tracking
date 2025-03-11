@@ -6,30 +6,22 @@ if (!process.env.MONGODB_URI) {
 }
 
 const uri = process.env.MONGODB_URI;
+const options = {};
 
 interface GlobalWithMongo {
   _mongoClientPromise?: Promise<MongoClient>;
 }
 
+// In global scope, declare the _mongoClientPromise variable
 declare const global: GlobalWithMongo;
 
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
+// Create cached connection
+let cached = global._mongoClientPromise;
 
-if (process.env.NODE_ENV === 'development') {
-  // In development mode, use a global variable so that the value
-  // is preserved across module reloads caused by HMR (Hot Module Replacement).
-  if (!global._mongoClientPromise) {
-    client = new MongoClient(uri);
-    global._mongoClientPromise = client.connect();
-  }
-  clientPromise = global._mongoClientPromise;
-} else {
-  // In production mode, it's best to not use a global variable.
-  client = new MongoClient(uri);
-  clientPromise = client.connect();
+if (!cached) {
+  cached = global._mongoClientPromise = new MongoClient(uri, options).connect();
 }
 
-// Export a module-scoped MongoClient promise. By doing this in a
-// separate module, the client can be shared across functions.
+const clientPromise = cached;
+
 export default clientPromise;
