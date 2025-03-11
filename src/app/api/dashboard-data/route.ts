@@ -1,5 +1,5 @@
 // src/app/api/dashboard-data/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { TrackingPixel, OpenEvent } from '@/types';
 
