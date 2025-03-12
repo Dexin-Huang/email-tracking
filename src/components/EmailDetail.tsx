@@ -1,4 +1,3 @@
-// src/components/EmailDetail.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -16,17 +15,21 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showAutoLoads, setShowAutoLoads] = useState(false);
-  
-  // Filter out auto-loads by default
+
+  // Delete the duplicate declaration and keep only one filteredOpens that checks if data.opens exists.
   const filteredOpens = useMemo(() => {
-    return showAutoLoads ? data.opens : data.opens.filter(open => !open.isInitialLoad);
+    if (!data.opens) return [];
+    return showAutoLoads
+      ? data.opens
+      : data.opens.filter(open => !open.isInitialLoad);
   }, [data.opens, showAutoLoads]);
-  
-  // Get counts of auto-loads
+
+  // Use a single openCounts definition with consistent property names.
   const openCounts = useMemo(() => {
-    const autoLoads = data.opens.filter(open => open.isInitialLoad).length;
-    const realOpens = data.opens.length - autoLoads;
-    return { autoLoads, realOpens };
+    if (!data.opens) return { real: 0, auto: 0 };
+    const auto = data.opens.filter(open => open.isInitialLoad).length;
+    const real = data.opens.length - auto;
+    return { real, auto };
   }, [data.opens]);
 
   // Function to refresh data
@@ -108,14 +111,6 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
     setLoading(false);
   };
 
-  // Filter opens based on the auto-load flag
-  const filteredOpens = useMemo(() => {
-    if (!data.opens) return [];
-    return showAutoLoads
-      ? data.opens
-      : data.opens.filter(open => !open.isInitialLoad);
-  }, [data.opens, showAutoLoads]);
-
   // Calculate time-based stats on filtered opens
   const timeStats = useMemo(() => {
     if (!filteredOpens.length) return null;
@@ -137,8 +132,8 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
     });
 
     // Parse user agents
-    const browsers = {};
-    const devices = {};
+    const browsers: { [key: string]: number } = {};
+    const devices: { [key: string]: number } = {};
 
     filteredOpens.forEach(open => {
       let browser = 'Unknown';
@@ -160,11 +155,8 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
       else if (ua.includes('ipad')) device = 'Tablet';
       else device = 'Desktop';
 
-      if (!browsers[browser]) browsers[browser] = 0;
-      browsers[browser]++;
-
-      if (!devices[device]) devices[device] = 0;
-      devices[device]++;
+      browsers[browser] = (browsers[browser] || 0) + 1;
+      devices[device] = (devices[device] || 0) + 1;
     });
 
     const topBrowser = Object.entries(browsers).sort((a, b) => b[1] - a[1])[0]?.[0] || 'None';
@@ -237,14 +229,6 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
     };
   }, [timeStats]);
 
-  // Get counts of real vs. auto-load opens
-  const openCounts = useMemo(() => {
-    if (!data.opens) return { real: 0, auto: 0 };
-    const auto = data.opens.filter(open => open.isInitialLoad).length;
-    const real = data.opens.length - auto;
-    return { real, auto };
-  }, [data.opens]);
-
   return (
     <div className="space-y-6">
       <div className="mb-6 flex justify-between items-center">
@@ -268,9 +252,9 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
         </div>
         
         {/* Auto-load indicator if any exist */}
-        {openCounts.autoLoads > 0 && (
+        {openCounts.auto > 0 && (
           <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            <span className="font-semibold">Opens:</span> {openCounts.realOpens} real / {openCounts.autoLoads} auto-loads
+            <span className="font-semibold">Opens:</span> {openCounts.real} real / {openCounts.auto} auto-loads
             <button 
               onClick={() => setShowAutoLoads(!showAutoLoads)}
               className="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
