@@ -38,3 +38,29 @@ export interface EmailStats {
     isInitialLoad?: boolean; // Include this in the opens array
   }[];
 }
+
+export interface AnalyticsData {
+  totalEmails: number;
+  openedEmails: number;
+  openRate: string;
+  opensByDay: number[];
+  dayNames: string[];
+  opensByHour: number[];
+  topEmails: {
+    trackingId: string;
+    label: string;
+    count: number;
+  }[];
+  browserData: {
+    browser: string;
+    count: number;
+  }[];
+  deviceData: {
+    device: string;
+    count: number;
+  }[];
+  opensOverTime: {
+    date: string;
+    count: number;
+  }[];
+}

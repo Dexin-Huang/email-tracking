@@ -5,10 +5,15 @@ export const dynamicParams = true;
 import EmailDetail from '@/components/EmailDetail';
 
 async function getEmailStats(id) {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/stats?id=${id}`,
-    { cache: 'no-store' }
-  );
+  // Create a complete URL with protocol
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const url = new URL('/api/stats', baseUrl);
+  url.searchParams.append('id', id);
+
+  const res = await fetch(url.toString(), { 
+    cache: 'no-store' 
+  });
+  
   if (!res.ok) {
     throw new Error('Failed to fetch email data');
   }
