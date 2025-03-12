@@ -43,12 +43,15 @@ export async function GET(request: NextRequest) {
       .sort({ timestamp: -1 })
       .toArray();
 
-    // Process data for response
-    const firstOpen = opens.length > 0 ? opens[opens.length - 1].timestamp : null;
-    const lastOpen = opens.length > 0 ? opens[0].timestamp : null;
+    // Filter out initial loads for calculations
+    const realOpens = opens.filter(open => !open.isInitialLoad);
 
-    // Get unique opens by IP (simple deduplication)
-    const uniqueIps = [...new Set(opens.map(open => open.ip))];
+    // Process data for response
+    const firstRealOpen = realOpens.length > 0 ? realOpens[realOpens.length - 1].timestamp : null;
+    const lastRealOpen = realOpens.length > 0 ? realOpens[0].timestamp : null;
+
+    // Get unique opens by IP (simple deduplication), excluding initial loads
+    const uniqueIps = [...new Set(realOpens.map(open => open.ip))];
 
     const response: EmailStats = {
       trackingId: id,
@@ -59,13 +62,15 @@ export async function GET(request: NextRequest) {
       stats: {
         totalOpens: opens.length,
         uniqueOpens: uniqueIps.length,
-        firstOpen,
-        lastOpen
+        firstOpen: firstRealOpen,
+        lastOpen: lastRealOpen,
+        totalRealOpens: realOpens.length // Count of genuine opens (non-initial loads)
       },
       opens: opens.map(open => ({
         timestamp: open.timestamp,
         ip: open.ip,
-        userAgent: open.userAgent
+        userAgent: open.userAgent,
+        isInitialLoad: open.isInitialLoad
       }))
     };
 

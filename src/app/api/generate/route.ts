@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json();
-    const { label, recipient, subject } = body || {};
+    const { label, recipient, subject, sentAt } = body || {};
 
     // Generate a unique ID (8 characters for brevity in URLs)
     const trackingId = crypto.randomBytes(4).toString('hex');
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       recipient: recipient || undefined,
       subject: subject || undefined,
       created: new Date(),
+      sentAt: sentAt || undefined, // Store the sent timestamp
     };
 
     await db.collection('pixels').insertOne(pixelData);

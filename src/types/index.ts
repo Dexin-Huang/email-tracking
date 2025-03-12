@@ -6,6 +6,7 @@ export interface TrackingPixel {
   recipient?: string;
   subject?: string;
   created: Date | string;
+  sentAt?: number; // Add this field to store when the email was sent
 }
 
 export interface OpenEvent {
@@ -14,6 +15,7 @@ export interface OpenEvent {
   ip: string;
   userAgent: string;
   referrer?: string;
+  isInitialLoad?: boolean; // Flag to mark Gmail's initial loads
 }
 
 export interface EmailStats {
@@ -27,10 +29,12 @@ export interface EmailStats {
     uniqueOpens: number;
     firstOpen: Date | string | null;
     lastOpen: Date | string | null;
+    totalRealOpens?: number; // New field to track only genuine opens
   };
   opens: {
     timestamp: Date | string;
     ip: string;
     userAgent: string;
+    isInitialLoad?: boolean; // Include this in the opens array
   }[];
 }

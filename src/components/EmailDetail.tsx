@@ -1,9 +1,10 @@
 // src/components/EmailDetail.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { EmailStats } from '@/types';
+import { Bar } from 'react-chartjs-2';
 
 interface EmailDetailProps {
   initialData: EmailStats;
@@ -13,6 +14,20 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
   const [data, setData] = useState<EmailStats>(initialData);
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showAutoLoads, setShowAutoLoads] = useState(false);
+  
+  // Filter out auto-loads by default
+  const filteredOpens = useMemo(() => {
+    return showAutoLoads ? data.opens : data.opens.filter(open => !open.isInitialLoad);
+  }, [data.opens, showAutoLoads]);
+  
+  // Get counts of auto-loads
+  const openCounts = useMemo(() => {
+    const autoLoads = data.opens.filter(open => open.isInitialLoad).length;
+    const realOpens = data.opens.length - autoLoads;
+    return { autoLoads, realOpens };
+  }, [data.opens]);
 
   // Function to refresh data
   const refreshData = useCallback(async () => {
@@ -66,6 +81,170 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
       .catch(err => console.error('Failed to copy:', err));
   };
 
+  // Delete tracking pixel
+  const deletePixel = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/delete-pixel?id=${data.trackingId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        window.location.href = '/';
+      } else {
+        alert('Failed to delete tracking pixel');
+        setConfirmDelete(false);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('An error occurred');
+      setConfirmDelete(false);
+    }
+    setLoading(false);
+  };
+
+  // Filter opens based on the auto-load flag
+  const filteredOpens = useMemo(() => {
+    if (!data.opens) return [];
+    return showAutoLoads
+      ? data.opens
+      : data.opens.filter(open => !open.isInitialLoad);
+  }, [data.opens, showAutoLoads]);
+
+  // Calculate time-based stats on filtered opens
+  const timeStats = useMemo(() => {
+    if (!filteredOpens.length) return null;
+
+    // Opens by hour of day
+    const opensByHour = Array(24).fill(0);
+    filteredOpens.forEach(open => {
+      const hour = new Date(open.timestamp).getHours();
+      opensByHour[hour]++;
+    });
+
+    // Opens by day of week
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const opensByDay = Array(7).fill(0);
+
+    filteredOpens.forEach(open => {
+      const day = new Date(open.timestamp).getDay();
+      opensByDay[day]++;
+    });
+
+    // Parse user agents
+    const browsers = {};
+    const devices = {};
+
+    filteredOpens.forEach(open => {
+      let browser = 'Unknown';
+      let device = 'Unknown';
+
+      const ua = open.userAgent.toLowerCase();
+
+      // Simple browser detection
+      if (ua.includes('chrome')) browser = 'Chrome';
+      else if (ua.includes('firefox')) browser = 'Firefox';
+      else if (ua.includes('safari') && !ua.includes('chrome')) browser = 'Safari';
+      else if (ua.includes('edge')) browser = 'Edge';
+      else if (ua.includes('opera') || ua.includes('opr')) browser = 'Opera';
+      else if (ua.includes('trident') || ua.includes('msie')) browser = 'Internet Explorer';
+
+      // Simple device detection
+      if (ua.includes('mobile')) device = 'Mobile';
+      else if (ua.includes('tablet')) device = 'Tablet';
+      else if (ua.includes('ipad')) device = 'Tablet';
+      else device = 'Desktop';
+
+      if (!browsers[browser]) browsers[browser] = 0;
+      browsers[browser]++;
+
+      if (!devices[device]) devices[device] = 0;
+      devices[device]++;
+    });
+
+    const topBrowser = Object.entries(browsers).sort((a, b) => b[1] - a[1])[0]?.[0] || 'None';
+    const topDevice = Object.entries(devices).sort((a, b) => b[1] - a[1])[0]?.[0] || 'None';
+
+    // Get open dates in order
+    const openDates = filteredOpens.map(open => new Date(open.timestamp))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    // Calculate median time to open (if there was a created date)
+    let medianTimeToOpen = null;
+    if (data.created && openDates.length) {
+      const createdDate = new Date(data.created);
+      const timeToOpenMinutes = openDates.map(date =>
+        Math.floor((date.getTime() - createdDate.getTime()) / 60000)
+      );
+
+      // Calculate median
+      const sortedTimes = [...timeToOpenMinutes].sort((a, b) => a - b);
+      const mid = Math.floor(sortedTimes.length / 2);
+
+      medianTimeToOpen = sortedTimes.length % 2 === 0
+        ? (sortedTimes[mid - 1] + sortedTimes[mid]) / 2
+        : sortedTimes[mid];
+    }
+
+    return {
+      opensByHour,
+      opensByDay,
+      dayNames,
+      topBrowser,
+      topDevice,
+      medianTimeToOpen
+    };
+  }, [filteredOpens, data.created]);
+
+  // Chart data for opens by hour
+  const opensByHourData = useMemo(() => {
+    if (!timeStats) return null;
+
+    return {
+      labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+      datasets: [
+        {
+          label: 'Opens by Hour',
+          data: timeStats.opensByHour,
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+          borderColor: 'rgb(75, 192, 192)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  }, [timeStats]);
+
+  // Chart data for opens by day of week
+  const opensByDayData = useMemo(() => {
+    if (!timeStats) return null;
+
+    return {
+      labels: timeStats.dayNames,
+      datasets: [
+        {
+          label: 'Opens by Day of Week',
+          data: timeStats.opensByDay,
+          backgroundColor: 'rgba(53, 162, 235, 0.5)',
+          borderColor: 'rgb(53, 162, 235)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  }, [timeStats]);
+
+  // Get counts of real vs. auto-load opens
+  const openCounts = useMemo(() => {
+    if (!data.opens) return { real: 0, auto: 0 };
+    const auto = data.opens.filter(open => open.isInitialLoad).length;
+    const real = data.opens.length - auto;
+    return { real, auto };
+  }, [data.opens]);
+
   return (
     <div className="space-y-6">
       <div className="mb-6 flex justify-between items-center">
@@ -87,8 +266,21 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
           {data.recipient && <p>Recipient: {data.recipient}</p>}
           <p>Created: {formatDate(data.created)}</p>
         </div>
+        
+        {/* Auto-load indicator if any exist */}
+        {openCounts.autoLoads > 0 && (
+          <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <span className="font-semibold">Opens:</span> {openCounts.realOpens} real / {openCounts.autoLoads} auto-loads
+            <button 
+              onClick={() => setShowAutoLoads(!showAutoLoads)}
+              className="ml-2 text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              {showAutoLoads ? 'Hide auto-loads' : 'Show all opens'}
+            </button>
+          </div>
+        )}
 
-        <div className="flex gap-3 mt-4">
+        <div className="flex flex-wrap gap-3 mt-4">
           <button
             onClick={copyTrackingUrl}
             className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700
@@ -116,33 +308,52 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
               'Refresh Data'
             )}
           </button>
+
+          <button
+            onClick={deletePixel}
+            disabled={loading}
+            className={`px-4 py-2 rounded-md text-sm font-medium ${
+              confirmDelete
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-red-100 hover:bg-red-200 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-800/50 dark:text-red-400'
+            }`}
+          >
+            {confirmDelete ? 'Confirm Delete' : 'Delete Tracking Pixel'}
+          </button>
         </div>
       </div>
 
-      {/* Stats summary */}
+      {/* Stats summary with real vs auto-load notification */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="text-sm text-gray-500 dark:text-gray-400">Total Opens</div>
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {data.stats.totalOpens}
+            {openCounts.real}
           </div>
+          {openCounts.auto > 0 && (
+            <div className="text-xs text-gray-500 mt-1">
+              <span className="cursor-pointer hover:underline" onClick={() => setShowAutoLoads(!showAutoLoads)}>
+                {showAutoLoads ? 'Hiding' : 'Hidden'}: {openCounts.auto} Gmail auto-load{openCounts.auto !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="text-sm text-gray-500 dark:text-gray-400">Unique Opens</div>
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             {data.stats.uniqueOpens}
           </div>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="text-sm text-gray-500 dark:text-gray-400">First Opened</div>
           <div className={`text-base ${data.stats.firstOpen ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
             {formatDate(data.stats.firstOpen)}
           </div>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="text-sm text-gray-500 dark:text-gray-400">Last Opened</div>
           <div className={`text-base ${data.stats.lastOpen ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
             {formatDate(data.stats.lastOpen)}
@@ -150,13 +361,112 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
         </div>
       </div>
 
+      {/* Enhanced analytics */}
+      {timeStats && filteredOpens.length > 0 && (
+        <section className="space-y-8 mb-8">
+          <h2 className="text-xl font-semibold">Email Analytics</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-500 dark:text-gray-400">Top Browser</div>
+              <div className="text-base font-semibold text-blue-600 dark:text-blue-400">
+                {timeStats.topBrowser}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-500 dark:text-gray-400">Top Device</div>
+              <div className="text-base font-semibold text-blue-600 dark:text-blue-400">
+                {timeStats.topDevice}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-500 dark:text-gray-400">Median Time to Open</div>
+              <div className="text-base font-semibold text-blue-600 dark:text-blue-400">
+                {timeStats.medianTimeToOpen !== null
+                  ? `${timeStats.medianTimeToOpen} minutes`
+                  : 'N/A'}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Opens by hour */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold mb-4">Opens by Hour of Day</h3>
+              <div className="h-64">
+                {opensByHourData && <Bar
+                  data={opensByHourData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          precision: 0
+                        }
+                      }
+                    }
+                  }}
+                />}
+              </div>
+            </div>
+
+            {/* Opens by day of week */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-5 shadow-sm border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold mb-4">Opens by Day of Week</h3>
+              <div className="h-64">
+                {opensByDayData && <Bar
+                  data={opensByDayData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          precision: 0
+                        }
+                      }
+                    }
+                  }}
+                />}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Opens table */}
       <section>
-        <h2 className="text-xl font-semibold mb-4">Open Events</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Open Events</h2>
 
-        {data.opens.length === 0 ? (
+          {openCounts.auto > 0 && (
+            <div className="flex items-center">
+              <label className="inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={showAutoLoads}
+                  onChange={() => setShowAutoLoads(!showAutoLoads)}
+                />
+                <div className="relative w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                <span className="ms-3 text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Show Gmail auto-loads
+                </span>
+              </label>
+            </div>
+          )}
+        </div>
+
+        {filteredOpens.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400 italic">
-            This email has not been opened yet.
+            {data.opens.length > 0
+              ? "All opens were filtered out as Gmail auto-loads. Enable 'Show Gmail auto-loads' to see them."
+              : "This email has not been opened yet."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -166,16 +476,32 @@ export default function EmailDetail({ initialData }: EmailDetailProps) {
                   <th className="text-left p-3 border-b border-gray-200 dark:border-gray-700">Timestamp</th>
                   <th className="text-left p-3 border-b border-gray-200 dark:border-gray-700">IP Address</th>
                   <th className="text-left p-3 border-b border-gray-200 dark:border-gray-700">User Agent</th>
+                  {showAutoLoads && (
+                    <th className="text-center p-3 border-b border-gray-200 dark:border-gray-700">Type</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
-                {data.opens.map((open, index) => (
-                  <tr key={index} className="border-b border-gray-200 dark:border-gray-700">
+                {filteredOpens.map((open, index) => (
+                  <tr key={index} className={`border-b border-gray-200 dark:border-gray-700 ${open.isInitialLoad ? 'bg-gray-50 dark:bg-gray-800/50' : ''}`}>
                     <td className="p-3 text-gray-600 dark:text-gray-300">{formatDate(open.timestamp)}</td>
                     <td className="p-3 text-gray-600 dark:text-gray-300">{open.ip}</td>
                     <td className="p-3 text-gray-600 dark:text-gray-300 truncate max-w-xs">
                       {open.userAgent}
                     </td>
+                    {showAutoLoads && (
+                      <td className="p-3 text-center">
+                        {open.isInitialLoad ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                            Auto-load
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800/20 dark:text-green-400">
+                            Genuine
+                          </span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
