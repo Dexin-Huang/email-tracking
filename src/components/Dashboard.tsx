@@ -1,4 +1,3 @@
-// src/components/Dashboard.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -175,7 +174,7 @@ export default function Dashboard({ initialPixels, initialOpens }: DashboardProp
     });
 
     // Top emails by open count
-    const emailOpenCounts = {};
+    const emailOpenCounts: Record<string, number> = {};
     filteredOpens.forEach(open => {
       if (!emailOpenCounts[open.trackingId]) {
         emailOpenCounts[open.trackingId] = 0;
@@ -196,8 +195,8 @@ export default function Dashboard({ initialPixels, initialOpens }: DashboardProp
       });
 
     // Parse user agents to determine browser/device
-    const browsers = {};
-    const devices = {};
+    const browsers: Record<string, number> = {};
+    const devices: Record<string, number> = {};
 
     filteredOpens.forEach(open => {
       let browser = 'Unknown';
@@ -219,11 +218,8 @@ export default function Dashboard({ initialPixels, initialOpens }: DashboardProp
       else if (ua.includes('ipad')) device = 'Tablet';
       else device = 'Desktop';
 
-      if (!browsers[browser]) browsers[browser] = 0;
-      browsers[browser]++;
-
-      if (!devices[device]) devices[device] = 0;
-      devices[device]++;
+      browsers[browser] = (browsers[browser] || 0) + 1;
+      devices[device] = (devices[device] || 0) + 1;
     });
 
     const browserData = Object.entries(browsers).map(([browser, count]) => ({
